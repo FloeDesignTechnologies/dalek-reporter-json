@@ -88,7 +88,9 @@ var reporter = null;
  *
  * ```javascript
  * "json-reporter": {
- *   "dest": "your/folder/your_file.json"
+ *   "dest": "your/folder/your_file.json",
+ *   "saveOnTestFinished": true,
+ *   "appendDate": true,
  * }
  * ```
  *
@@ -108,6 +110,9 @@ function Reporter (opts) {
 
   var defaultReportFolder = 'report';
   this.dest = this.config.get('json-reporter') && this.config.get('json-reporter').dest ? this.config.get('json-reporter').dest : defaultReportFolder;
+  this.saveOnTestFinished = this.config.get('json-reporter') && this.config.get('json-reporter').saveOnTestFinished ? this.config.get('json-reporter').saveOnTestFinished : false;
+  this.appendDate = this.config.get('json-reporter') && this.config.get('json-reporter').appendDate ? this.config.get('json-reporter').appendDate : false;
+
 
   this.startListening();
 }
@@ -195,6 +200,7 @@ Reporter.prototype = {
   testStarted: function (data) {
     this.currentTest = data;
     this.actionQueue = [];
+    this.dateStarted = new Date();
     return this;
   },
 
@@ -216,6 +222,9 @@ Reporter.prototype = {
       failedAssertions: data.failedAssertions,
       actions: this.actionQueue
     });
+    if(this.saveOnTestFinished()){
+        return this._writeReport(this.data);
+    }
     return this;
   },
 
@@ -234,14 +243,25 @@ Reporter.prototype = {
     this.data.assertionsFailed = data.assertionsFailed;
     this.data.assertionsPassed = data.assertionsPassed;
 
-    var contents = JSON.stringify(this.data, false, 4);
 
+    return this._writeReport(this.data);
+  },
+
+  /**
+   * Helper method to write the report
+   *
+   * @method _writeReport
+   * @param {object} data Event data
+   */
+
+  _writeReport: function (data) {
     if (path.extname(this.dest) !== '.json') {
       this.dest = this.dest + '/dalek.json';
     }
 
     this.events.emit('report:written', {type: 'json', dest: this.dest});
     this._recursiveMakeDirSync(path.dirname(this.dest.replace(path.basename(this.dest, ''))));
+    var contents = JSON.stringify(data, false, 4);
     fs.writeFileSync(this.dest, contents, 'utf8');
     return this;
   },
